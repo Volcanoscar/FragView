@@ -7,8 +7,13 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ListView;
+
+import com.volcanoscar.fragview.adatper.ListviewAdapter;
 import com.volcanoscar.fragview.dummy.DummyContent;
 import com.volcanoscar.fragview.dummy.DummyContent.DummyItem;
 
@@ -16,19 +21,24 @@ import java.util.List;
 
 /**
  * A fragment representing a list of Items.
- * <p />
+ * <p/>
  * Activities containing this fragment MUST implement the {@link OnListFragmentInteractionListener}
  * interface.
  */
-public class ItemFragment extends Fragment {
-
-    // TODO: Customize parameters
-    private int mColumnCount = 1;
+public class ItemFragment extends BaseFragment implements View.OnClickListener, View.OnTouchListener {
 
     // TODO: Customize parameter argument names
     private static final String ARG_COLUMN_COUNT = "column-count";
-
+    // TODO: Customize parameters
+    private int mColumnCount = 1;
     private OnListFragmentInteractionListener mListener;
+
+    /**
+     * Mandatory empty constructor for the fragment manager to instantiate the
+     * fragment (e.g. upon screen orientation changes).
+     */
+    public ItemFragment() {
+    }
 
     // TODO: Customize parameter initialization
     @SuppressWarnings("unused")
@@ -38,13 +48,6 @@ public class ItemFragment extends Fragment {
         args.putInt(ARG_COLUMN_COUNT, columnCount);
         fragment.setArguments(args);
         return fragment;
-    }
-
-    /**
-     * Mandatory empty constructor for the fragment manager to instantiate the
-     * fragment (e.g. upon screen orientation changes).
-     */
-    public ItemFragment() {
     }
 
     @Override
@@ -60,18 +63,11 @@ public class ItemFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_item_list, container, false);
-
-        // Set the adapter
-        if (view instanceof RecyclerView) {
-            Context context = view.getContext();
-            RecyclerView recyclerView = (RecyclerView) view;
-            if (mColumnCount <= 1) {
-                recyclerView.setLayoutManager(new LinearLayoutManager(context));
-            } else {
-                recyclerView.setLayoutManager(new GridLayoutManager(context, mColumnCount));
-            }
-            recyclerView.setAdapter(new MyItemRecyclerViewAdapter(DummyContent.ITEMS, mListener));
-        }
+        listView = (ListView) view.findViewById(R.id.listview);
+        listView.setAdapter(new ListviewAdapter(getActivity(),DummyContent.ITEMS));
+        listView.setOnTouchListener(this);
+        view.findViewById(R.id.confirm_bt).setOnClickListener(this);
+        view.findViewById(R.id.cancel_bt).setOnClickListener(this);
         return view;
     }
 
@@ -93,6 +89,96 @@ public class ItemFragment extends Fragment {
         mListener = null;
     }
 
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()){
+            case R.id.confirm_bt:
+                if (mListener!=null){
+                    mListener.onListFragmentInteraction(mColumnCount,true);
+                }
+                break;
+            case R.id.cancel_bt:
+                if (mListener!=null){
+                    mListener.onListFragmentInteraction(mColumnCount,false);
+                }
+        }
+    }
+
+
+    private enum DIRECTION{
+        HORIZONTAL,
+        VERTICAL,
+        NONE
+    }
+
+    private DIRECTION mSlideDir = DIRECTION.NONE;
+    private float mStartRawX,mStartRawY;
+    private float mCurRawX,mCurRawY;
+    private float mLastRawX,mLastRawY;
+    private boolean lvScrollFirst = false;
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        mCurRawX = event.getRawX();
+        mCurRawY = event.getRawY();
+        switch (event.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                mStartRawX = event.getRawX();
+                mStartRawY = event.getRawY();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (mSlideDir==DIRECTION.NONE && (mCurRawX!=mStartRawX||mCurRawY!=mStartRawY)){
+                    if (Math.abs(mCurRawX-mStartRawX) > Math.abs(mCurRawY-mStartRawY)*Math.sqrt(3)){
+                        mSlideDir = DIRECTION.HORIZONTAL;
+                    }else {
+                        mSlideDir = DIRECTION.VERTICAL;
+                    }
+                }
+                if (mSlideDir == DIRECTION.VERTICAL){
+                    if (MainActivity.isExpand()){
+                        if ((listView.getChildCount() > 0
+                                && listView.getFirstVisiblePosition() == 0
+                                && listView.getChildAt(0).getTop() >= 0)){
+
+                        }
+                    }
+                    resetLayoutParam(v,mCurRawY-mLastRawY);
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                if (mSlideDir == DIRECTION.VERTICAL){
+                    if (((mCurRawY - mStartRawY)>MainActivity.MOVE_BAUNDRY&&MainActivity.isExpand())
+                            ||((mStartRawY-mCurRawY)<MainActivity.MOVE_BAUNDRY&&!MainActivity.isExpand())){
+                        if (mListener!=null){
+                            mListener.onListFragmentInteraction(mColumnCount,false);
+                            MainActivity.setExpand(false);
+                        }
+                    }else if (((mCurRawY - mStartRawY)<=MainActivity.MOVE_BAUNDRY&&MainActivity.isExpand())
+                            ||((mStartRawY - mCurRawY)>=MainActivity.MOVE_BAUNDRY&&!MainActivity.isExpand())){
+                        if (mListener!=null){
+                            mListener.onListFragmentInteraction(mColumnCount,true);
+                            MainActivity.setExpand(true);
+                        }
+                    }
+                }
+                mSlideDir = DIRECTION.NONE;
+                break;
+            default:
+                break;
+        }
+        mLastRawX = mCurRawX;
+        mLastRawY = mCurRawY;
+        return false;
+    }
+
+    private void resetLayoutParam(View v, float delta) {
+        FrameLayout.LayoutParams mParam = (FrameLayout.LayoutParams) v.getLayoutParams();
+        mParam.topMargin += delta;
+        if (mParam.topMargin > MainActivity.MARGINTOP_MAX||mParam.topMargin<MainActivity.MARGINTOP_MIN){
+            return;
+        }
+        v.setLayoutParams(mParam);
+    }
+
     /**
      * This interface must be implemented by activities that contain this
      * fragment to allow an interaction in this fragment to be communicated
@@ -105,6 +191,6 @@ public class ItemFragment extends Fragment {
      */
     public interface OnListFragmentInteractionListener {
         // TODO: Update argument type and name
-        void onListFragmentInteraction(DummyItem item);
+        void onListFragmentInteraction(int position,boolean expand);
     }
 }

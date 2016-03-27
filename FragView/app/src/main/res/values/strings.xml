@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">FragView</string>
+    <string name="confirm_bt">Confirm</string>
+    <string name="cancel_bt">Cancel</string>
+</resources>

@@ -116,14 +116,23 @@ public class ItemFragment extends BaseFragment implements View.OnClickListener, 
     private float mCurRawX,mCurRawY;
     private float mLastRawX,mLastRawY;
     private boolean lvScrollFirst = false;
+    private boolean restart = false;
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         mCurRawX = event.getRawX();
         mCurRawY = event.getRawY();
         switch (event.getAction()){
             case MotionEvent.ACTION_DOWN:
+                restart = true;
                 mStartRawX = event.getRawX();
                 mStartRawY = event.getRawY();
+                if ((listView.getChildCount() > 0
+                        && listView.getFirstVisiblePosition() == 0
+                        && listView.getChildAt(0).getTop() < 0)
+                        ||(listView.getChildCount() > 0
+                        && listView.getFirstVisiblePosition() > 0)){
+                    lvScrollFirst = true;
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mSlideDir==DIRECTION.NONE && (mCurRawX!=mStartRawX||mCurRawY!=mStartRawY)){
@@ -135,17 +144,27 @@ public class ItemFragment extends BaseFragment implements View.OnClickListener, 
                 }
                 if (mSlideDir == DIRECTION.VERTICAL){
                     if (MainActivity.isExpand()){
-                        if ((listView.getChildCount() > 0
+                        if (lvScrollFirst && (listView.getChildCount() > 0
                                 && listView.getFirstVisiblePosition() == 0
                                 && listView.getChildAt(0).getTop() >= 0)){
-
+                            lvScrollFirst = false;
+                            restart = false;
+                            return true;
                         }
+                        if (!lvScrollFirst){
+                            resetLayoutParam(v,mCurRawY-mLastRawY);
+                        }
+                    }else {
+                        resetLayoutParam(v,mCurRawY-mLastRawY);
                     }
-                    resetLayoutParam(v,mCurRawY-mLastRawY);
                 }
                 break;
             case MotionEvent.ACTION_UP:
                 if (mSlideDir == DIRECTION.VERTICAL){
+                    if (!restart){
+                        restart = false;
+                        break;
+                    }
                     if (((mCurRawY - mStartRawY)>MainActivity.MOVE_BAUNDRY&&MainActivity.isExpand())
                             ||((mStartRawY-mCurRawY)<MainActivity.MOVE_BAUNDRY&&!MainActivity.isExpand())){
                         if (mListener!=null){
@@ -161,6 +180,7 @@ public class ItemFragment extends BaseFragment implements View.OnClickListener, 
                     }
                 }
                 mSlideDir = DIRECTION.NONE;
+                restart = false;
                 break;
             default:
                 break;
